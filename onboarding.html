@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome to History Broom</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg-color: #f4f6f8;
+      --text-main: #1a1a1a;
+      --text-muted: #555555;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --accent: #4CAF50;
+      --accent-hover: #45a049;
+      --gradient-start: #e0f2f1;
+      --gradient-end: #ffffff;
+      --border: rgba(0,0,0,0.08);
+      --shadow: rgba(0, 0, 0, 0.05);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg-color: #0f1115;
+        --text-main: #f0f0f0;
+        --text-muted: #aaaaaa;
+        --card-bg: rgba(30, 32, 38, 0.7);
+        --accent: #4CAF50;
+        --accent-hover: #5cb860;
+        --gradient-start: #121814;
+        --gradient-end: #0f1115;
+        --border: rgba(255,255,255,0.06);
+        --shadow: rgba(0, 0, 0, 0.3);
+      }
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 90%;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px var(--shadow);
+      padding: 30px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .header img {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+      animation: bounceIn 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      60% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+
+    h1 {
+      font-size: 2.2em;
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #4CAF50, #2E7D32);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      h1 {
+        background: linear-gradient(90deg, #81c784, #4CAF50);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+    }
+
+    p.subtitle {
+      font-size: 1em;
+      color: var(--text-muted);
+      margin-top: 8px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      padding: 15px 20px;
+      border-radius: 16px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px var(--shadow);
+    }
+
+    .card h3 {
+      margin-top: 0;
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-wrapper {
+      background: rgba(76, 175, 80, 0.1);
+      color: var(--accent);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.9em;
+      line-height: 1.6;
+      margin-bottom: 0;
+    }
+
+    .privacy-box {
+      background: rgba(76, 175, 80, 0.05);
+      border-left: 4px solid var(--accent);
+      padding: 15px 20px;
+      border-radius: 0 12px 12px 0;
+      margin-bottom: 25px;
+    }
+
+    .privacy-box h3 {
+      margin-top: 0;
+      color: var(--accent);
+      font-size: 1.1em;
+    }
+
+    .privacy-box p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.9em;
+      line-height: 1.5;
+    }
+
+    .action-container {
+      text-align: center;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      font-size: 1em;
+      font-weight: 600;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <img src="icon128.png" alt="History Broom Logo">
+      <h1>You're all set!</h1>
+      <p class="subtitle">History Broom is now installed. Let's get your browsing history cleaned up automatically.</p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>
+          <div class="icon-wrapper">📌</div>
+          1. Pin the Extension
+        </h3>
+        <p>Click the puzzle icon in your browser toolbar and pin <strong>History Broom</strong> so you can access it easily.</p>
+      </div>
+      
+      <div class="card">
+        <h3>
+          <div class="icon-wrapper">✍️</div>
+          2. Add Keywords
+        </h3>
+        <p>Open the extension popup and add keywords or domain names you want to automatically scrub from your history.</p>
+      </div>
+
+      <div class="card">
+        <h3>
+          <div class="icon-wrapper">⚡</div>
+          3. Set Automation
+        </h3>
+        <p>Choose when cleanup happens: on browser start, when closing a tab, on an idle timer, or instantly in real-time.</p>
+      </div>
+
+      <div class="card">
+        <h3>
+          <div class="icon-wrapper">🛡️</div>
+          4. Add Exceptions
+        </h3>
+        <p>Need to keep some sites? Add exceptions in the popup to ensure specific URLs are never deleted.</p>
+      </div>
+    </div>
+
+    <div class="privacy-box">
+      <h3>Zero Data Collection Pledge</h3>
+      <p>
+        History Broom operates 100% locally on your device. We <strong>never</strong> collect, monitor, or transmit your browsing data, analytics, or settings to any external servers. The permissions requested are used strictly to find and erase the keywords you specify, directly within your browser.
+      </p>
+    </div>
+
+    <div class="action-container">
+      <button class="btn" id="startBtn">Got it, let's start!</button>
+    </div>
+  </div>
+
+  <script src="onboarding.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "History Broom",
+  "version": "1.0.0",
+  "description": "Sweep browsing history, downloads & tabs clean by keyword — manually, on a timer, or the moment you go idle.",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "history",
+    "downloads",
+    "storage",
+    "tabs",
+    "idle",
+    "browsingData",
+    "alarms",
+    "notifications"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "History Broom",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "commands": {
+    "panic-clean": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period"
+      },
+      "description": "Panic: run a full cleanup immediately"
+    }
+  }
+}

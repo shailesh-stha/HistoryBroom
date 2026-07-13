@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>History Broom</title>
+  <style>
+    .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .brand img { width: 22px; height: 22px; }
+    .brand span { font-weight: 700; font-size: 1.05em; }
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --fg: #333333;
+      --muted: #666666;
+      --border: #dddddd;
+      --border-light: #eeeeee;
+      --panel: #f7f7f7;
+      --accent: #4CAF50;
+      --accent-hover: #45a049;
+      --danger: #ff4d4d;
+      --warn-bg: #fff8e1;
+      --warn-border: #ffe082;
+      --success-bg: #d4edda; --success-fg: #155724; --success-border: #c3e6cb;
+      --error-bg: #f8d7da; --error-fg: #721c24; --error-border: #f5c6cb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #1e1e1e;
+        --fg: #e0e0e0;
+        --muted: #9e9e9e;
+        --border: #3c3c3c;
+        --border-light: #333333;
+        --panel: #2a2a2a;
+        --warn-bg: #332b12;
+        --warn-border: #665822;
+        --success-bg: #1b3320; --success-fg: #a5d6a7; --success-border: #2e5233;
+        --error-bg: #3a1e21; --error-fg: #ef9a9a; --error-border: #5c3033;
+      }
+    }
+
+    body {
+      width: 340px; padding: 15px 15px 0 15px; margin: 0;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      color: var(--fg); background: var(--bg);
+    }
+
+    .bottom-fixed {
+      position: sticky;
+      bottom: 0;
+      background: var(--bg);
+      padding: 10px 0 15px 0;
+      border-top: 1px solid var(--border-light);
+      z-index: 10;
+    }
+
+    details {
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      margin-bottom: 12px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+    summary {
+      background: var(--panel);
+      padding: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95em;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    summary::after { content: '+'; font-weight: bold; color: var(--muted); }
+    details[open] summary::after { content: '-'; }
+    summary::-webkit-details-marker { display: none; }
+    summary:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 1px;
+    }
+
+    .details-content { padding: 12px; border-top: 1px solid var(--border-light); }
+
+    .input-group { display: flex; gap: 5px; margin-bottom: 10px; }
+    input, select, button {
+      font-family: inherit; font-size: inherit;
+      color: var(--fg); background: var(--bg);
+    }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      padding: 6px; border: 1px solid var(--border); border-radius: 4px;
+    }
+    input[type="text"], input[type="password"] { flex: 1; min-width: 0; }
+    input[type="number"] { width: 55px; margin-left: 5px; }
+    select { padding: 6px 2px; }
+
+    ul.item-list {
+      list-style: none; padding: 0; margin: 0;
+      max-height: 150px; overflow-y: auto;
+      border: 1px solid var(--border-light); border-radius: 4px;
+    }
+    .keyword-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 6px 10px; border-bottom: 1px solid var(--border-light);
+      font-size: 0.9em; background: var(--bg);
+    }
+    .keyword-item:last-child { border-bottom: none; }
+    .keyword-item .kw-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mode-chip, .range-chip {
+      font-size: 0.8em; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px;
+      flex-shrink: 0;
+    }
+    .empty-state { padding: 10px; font-size: 0.9em; color: var(--muted); text-align: center; }
+    .delete-btn {
+      background: var(--danger); color: white; border: none;
+      border-radius: 4px; cursor: pointer; padding: 2px 8px; font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 5px; }
+    .btn-row button {
+      padding: 10px; border: none; border-radius: 4px;
+      cursor: pointer; font-weight: bold;
+    }
+    #previewBtn {
+      flex: 1; background: var(--panel); color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    #clearBtn { flex: 2; background: var(--accent); color: white; }
+    #clearBtn:hover:not(:disabled) { background: var(--accent-hover); }
+    #clearBtn:disabled { opacity: 0.6; cursor: wait; }
+    #clearBtn.armed { background: var(--danger); }
+
+    #status {
+      position: relative;
+      font-size: 0.9em; text-align: center; font-weight: 500;
+      border-radius: 4px;
+      max-height: 0;
+      opacity: 0;
+      padding: 0 8px;
+      margin-top: 0;
+      overflow: hidden;
+      box-sizing: border-box;
+      border: 0 solid transparent;
+      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  opacity 0.2s ease,
+                  padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-width 0.3s ease;
+      z-index: 1;
+    }
+    #status.show {
+      max-height: 100px;
+      opacity: 1;
+      padding: 8px 30px 8px 12px; /* Pad right to prevent text overlapping the close button */
+      margin-top: 10px;
+      border-width: 1px;
+    }
+    .status-close-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font-size: 1.3em;
+      font-weight: bold;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      padding: 2px 6px;
+      line-height: 1;
+      user-select: none;
+      z-index: 2;
+    }
+    .status-close-btn:hover {
+      opacity: 1;
+    }
+    #status::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--panel);
+      z-index: -2;
+    }
+    #status::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--status-fill-bg, transparent);
+      z-index: -1;
+      transform: scaleX(0);
+      transform-origin: left;
+    }
+    #status.show::after {
+      animation: statusProgress 4s linear forwards;
+    }
+    @keyframes statusProgress {
+      0% { transform: scaleX(0); }
+      100% { transform: scaleX(1); }
+    }
+    .success {
+      --status-fill-bg: var(--success-bg);
+      color: var(--success-fg);
+      border-color: var(--success-border);
+    }
+    .error {
+      --status-fill-bg: var(--error-bg);
+      color: var(--error-fg);
+      border-color: var(--error-border);
+    }
+
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px; font-size: 0.9em; gap: 6px;
+    }
+    .settings-row:last-child { margin-bottom: 0; }
+    .settings-row label { display: flex; align-items: center; gap: 5px; }
+    .info-icon {
+      color: var(--muted);
+      cursor: help;
+      font-size: 0.95em;
+      margin-left: 4px;
+      user-select: none;
+    }
+
+    .warning-box {
+      background: var(--warn-bg); border: 1px solid var(--warn-border);
+      border-radius: 4px; padding: 8px; margin-top: 8px;
+    }
+    .warning-box .settings-row { margin-bottom: 2px; }
+
+    #statsBar { margin-top: 10px; font-size: 0.9em; color: var(--muted); text-align: center; }
+
+    hr { border: 0; border-top: 1px solid var(--border-light); margin: 10px 0; }
+
+    #lockScreen { text-align: center; padding: 20px 0; }
+    #lockScreen .input-group { justify-content: center; }
+    .small-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--panel); border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <div id="lockScreen" hidden>
+    <p><strong>🔒 Locked</strong></p>
+    <div class="input-group">
+      <input type="password" id="pinEntry" placeholder="Enter PIN" aria-label="PIN">
+      <button id="unlockBtn" class="small-btn">Unlock</button>
+    </div>
+  </div>
+
+  <div id="main" hidden>
+
+    <div class="brand"><img src="icon48.png" alt=""><span>History Broom</span></div>
+
+    <details id="detailsKeywords" open>
+      <summary>Keywords to Scrub</summary>
+      <div class="details-content">
+        <div class="input-group">
+          <input type="text" id="keywordInput" placeholder="Add word (e.g. 'secret')..." aria-label="Keyword to add">
+          <select id="modeSelect" aria-label="Match mode">
+            <option value="substring">contains</option>
+            <option value="word">word</option>
+            <option value="domain">domain</option>
+            <option value="regex">regex</option>
+          </select>
+          <select id="rangeSelect" aria-label="Time range">
+            <option value="all">all time</option>
+            <option value="1h">1h</option>
+            <option value="24h">24h</option>
+            <option value="7d">7d</option>
+            <option value="older30d">&gt;30d</option>
+          </select>
+          <button id="addBtn" class="small-btn">Add</button>
+        </div>
+        <ul id="keywordList" class="item-list"></ul>
+      </div>
+    </details>
+
+    <details id="detailsExceptions">
+      <summary>Exceptions (never remove)</summary>
+      <div class="details-content">
+        <div class="input-group">
+          <input type="text" id="exceptionInput" placeholder="e.g. mybank.com" aria-label="Exception to add">
+          <button id="addExceptionBtn" class="small-btn">Add</button>
+        </div>
+        <ul id="exceptionList" class="item-list"></ul>
+      </div>
+    </details>
+
+    <details id="detailsSettings">
+      <summary>Automation &amp; Settings</summary>
+      <div class="details-content">
+
+        <div class="settings-row">
+          <label><input type="checkbox" id="autoTabToggle"> Clear on Tab Close <span class="info-icon" title="Triggers a full cleanup of matching tabs, history, and downloads every time you close any browser tab.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row">
+          <label><input type="checkbox" id="startupToggle"> Clear on Browser Start <span class="info-icon" title="Runs a full cleanup of matching history, downloads, and tabs automatically whenever the browser is launched.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row">
+          <label><input type="checkbox" id="realtimeToggle"> Real-time Scrub <span class="info-icon" title="Instantly detects and deletes matching history entries the moment you visit them, without waiting for automated cleanups.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row">
+          <label><input type="checkbox" id="idleToggle"> Clear when Idle <span class="info-icon" title="Triggers a cleanup of matching tabs, history, and downloads when the browser remains inactive for the set number of minutes.">ⓘ</span></label>
+          <span>
+            <input type="number" id="idleMins" value="5" min="1" aria-label="Idle minutes"> min
+          </span>
+        </div>
+
+        <div class="settings-row">
+          <label><input type="checkbox" id="timerToggle"> Clear Every <span class="info-icon" title="Runs a full cleanup automatically on a repeating timer. Chrome restricts the minimum interval to 60 seconds (1 minute) in production.">ⓘ</span></label>
+          <span>
+            <input type="number" id="timerSecs" value="60" min="60" aria-label="Timer seconds"> sec
+          </span>
+        </div>
+
+        <hr>
+        <strong>Advanced</strong>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label>Batch Size (Iterative Delete) <span class="info-icon" title="Wipes history items in smaller, spaced-out batches (e.g. 100 at a time) to prevent Chrome from freezing during large cleanups.">ⓘ</span></label>
+          <span>
+            <input type="number" id="batchSize" value="100" min="1" aria-label="Batch size"> items
+          </span>
+        </div>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label><input type="checkbox" id="siteDataToggle"> Clean Site Data for Matches <span class="info-icon" title="Deletes cookies, local storage, databases, and cache ONLY for websites that match your keywords. Other websites remain unaffected.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label><input type="checkbox" id="protectPinnedToggle"> Protect Pinned Tabs <span class="info-icon" title="Excludes pinned tabs from being closed during cleanups, even if their titles or URLs match your keywords.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label><input type="checkbox" id="protectOpenTabsToggle"> Protect Open Tabs <span class="info-icon" title="Excludes all currently open tabs in browser windows from being closed during cleanups.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label><input type="checkbox" id="showBadgeToggle"> Show Toolbar Badge <span class="info-icon" title="Displays the number of active keywords on the extension's icon in your browser toolbar.">ⓘ</span></label>
+        </div>
+
+        <div class="settings-row" style="margin-top:8px;">
+          <label><input type="checkbox" id="enableSyncToggle"> Enable Settings Sync <span class="info-icon" title="Synchronizes your keywords, exceptions, and automation settings across all Chrome profiles logged into your browser account. Stats and history remain local.">ⓘ</span></label>
+        </div>
+
+        <div class="warning-box">
+          <div class="settings-row">
+            <label><input type="checkbox" id="deepCleanToggle"> ⚠ Deep Clean <span class="info-icon" title="Wipes ALL browser cache and autofill form data completely across the entire browser (not restricted to your keywords list).">ⓘ</span></label>
+          </div>
+        </div>
+
+        <hr>
+        <div class="settings-row" style="margin-top:8px;">
+          <label>Lock Popup with PIN <span class="info-icon" title="Restricts access to settings and keywords. Enter a PIN to secure the popup; leave blank and click Set PIN to disable.">ⓘ</span></label>
+        </div>
+        <div class="input-group" style="margin-top:4px;">
+          <input type="password" id="pinInput" placeholder="PIN (blank = off)" aria-label="Popup PIN">
+          <button id="setPinBtn" class="small-btn">Set PIN</button>
+        </div>
+
+        <div class="btn-row" style="margin-top:0;">
+          <button id="exportBtn" class="small-btn" style="flex:1;">Export Settings</button>
+          <button id="importBtn" class="small-btn" style="flex:1;">Import Settings</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button id="resetBtn" class="small-btn" style="flex:1; color: var(--danger); border-color: var(--error-border);">Reset to Defaults</button>
+        </div>
+
+      </div>
+    </details>
+
+
+    <div class="bottom-fixed">
+      <div class="btn-row" style="margin-top: 0;">
+        <button id="previewBtn">Preview</button>
+        <button id="clearBtn">Clear All Now</button>
+      </div>
+
+      <div id="statsBar"></div>
+      <div style="font-size: 0.82em; color: var(--danger); font-weight: 600; text-align: center; margin-top: 5px; margin-bottom: 2px;">
+        Deletion is permanent. Use with care.
+      </div>
+      <div id="status" role="status" aria-live="polite">
+        <span id="statusText"></span>
+        <button id="statusClose" class="status-close-btn" aria-label="Close notification" title="Close notification">&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+
+  <script src="popup.js"></script>
+</body>
+</html>
