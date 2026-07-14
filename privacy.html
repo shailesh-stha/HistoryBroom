@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - History Broom</title>
+    <style>
+        :root {
+            --bg-color: #f9f9f9;
+            --text-main: #333;
+            --text-muted: #666;
+            --accent: #4CAF50;
+            --container-bg: #fff;
+            --border-color: #eaeaea;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --text-main: #e0e0e0;
+                --text-muted: #aaa;
+                --accent: #81c784;
+                --container-bg: #1e1e1e;
+                --border-color: #333;
+            }
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--container-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            color: var(--accent);
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: var(--text-main);
+            margin-top: 30px;
+            font-size: 1.25em;
+        }
+
+        ul {
+            padding-left: 20px;
+            color: var(--text-muted);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .date {
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+        
+        code {
+            background-color: rgba(128, 128, 128, 0.1);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Privacy Policy for History Broom</h1>
+    <p class="date">Effective Date: July 7, 2026</p>
+    
+    <p>History Broom ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains our data practices for the History Broom Chrome Extension.</p>
+
+    <h3>1. Zero Data Collection & Off-Device Transmission</h3>
+    <p>History Broom is built with a strict <strong>local-only</strong> architecture.</p>
+    <ul>
+        <li><strong>No Server Communication:</strong> The extension does not communicate with any external servers.</li>
+        <li><strong>No Analytics or Tracking:</strong> We do not collect, monitor, or transmit any analytics, telemetry, crash logs, or usage statistics off your device.</li>
+        <li><strong>No Third-Party SDKs:</strong> The extension contains zero third-party tracking scripts, advertising SDKs, or analytics APIs.</li>
+    </ul>
+
+    <h3>2. Information We Process and Store (Locally)</h3>
+    <p>To perform its core functions, the extension accesses and processes certain browsing data locally on your device. This data is <strong>never</strong> sent to us or any third party:</p>
+    <ul>
+        <li><strong>Keywords & Exceptions:</strong> The terms you define for scrubbing are stored locally on your device to run the matching logic.</li>
+        <li><strong>Browsing History & Downloads:</strong> The extension reads your local browsing history and download history to find and erase records matching your keywords.</li>
+        <li><strong>Active Tabs:</strong> The extension reads tab titles and URLs to find and close tabs matching your keywords.</li>
+        <li><strong>Lock PIN:</strong> If you enable the lock screen feature, a SHA-256 hash of your PIN is stored locally to restrict access to the popup UI.</li>
+    </ul>
+
+    <h3>3. Local Data Storage & Sync</h3>
+    <ul>
+        <li><strong>Local Storage:</strong> All configuration settings, lists, and statistics are stored locally on your device using Chrome's sandboxed storage (<code>chrome.storage.local</code>).</li>
+        <li><strong>Optional Cloud Sync:</strong> If you explicitly enable the "Sync Settings" toggle, your keywords, exceptions, and configuration will be synced across your personal Chrome profiles using Google’s secure native synchronization (<code>chrome.storage.sync</code>). None of this data is accessible to us.</li>
+        <li><strong>Data Retention:</strong> All settings and configurations are deleted instantly and completely when you uninstall the extension.</li>
+    </ul>
+
+    <h3>4. Permission Justifications</h3>
+    <p>In accordance with the Chrome Web Store Developer Policies, here is why each permission is required:</p>
+    <ul>
+        <li><code>history</code>: To search for and delete matching URLs from your browser history.</li>
+        <li><code>downloads</code>: To search for and erase matching download records.</li>
+        <li><code>tabs</code>: To read open tab titles and URLs, and close matching tabs.</li>
+        <li><code>storage</code>: To save your settings, keywords, exceptions, and statistics locally.</li>
+        <li><code>alarms</code>: To trigger the optional recurring timer cleanup.</li>
+        <li><code>idle</code>: To trigger the optional cleanup when your device goes idle.</li>
+        <li><code>browsingData</code>: To run the optional Deep Clean (wiping cache and autofill forms) and clear site data.</li>
+        <li><code>notifications</code>: To display system notifications confirming that automated cleanups have finished.</li>
+    </ul>
+
+    <h3>5. Compliance with Chrome Web Store Limited Use Policy</h3>
+    <p>History Broom complies fully with the Google Chrome Web Store User Data Policy, including the <strong>Limited Use</strong> requirements:</p>
+    <ul>
+        <li>We only use permissions and access to data to provide and improve the single, core user-facing disclosure purpose of the extension (scrubbing data by keyword).</li>
+        <li>We <strong>never</strong> sell, rent, or lease any user data to third parties.</li>
+        <li>We <strong>never</strong> use or transfer user data for personalized advertising, credit checks, lending, or profiling.</li>
+        <li>Human review of user data is impossible because no user data is collected or transmitted.</li>
+    </ul>
+
+    <h3>6. Contact Information</h3>
+    <p>If you have any questions or feedback regarding this Privacy Policy, please contact the developer via the official GitHub repository support channel:</p>
+    <p><a href="https://github.com/shailesh-stha/HistoryBroom">https://github.com/shailesh-stha/HistoryBroom</a></p>
+</div>
+
+</body>
+</html>
