@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "History Broom",
-  "version": "1.0.0",
-  "description": "Sweep browsing history, downloads & tabs clean by keyword — manually, on a timer, or the moment you go idle.",
+  "version": "1.1.0",
+  "description": "Sweep browsing history, downloads & tabs clean by keyword, manually, on a timer, or the moment you go idle.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",

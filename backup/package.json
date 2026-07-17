@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test_matching.mjs"
+    "test": "node test_matching.mjs && node test_collect.mjs"
   }
 }

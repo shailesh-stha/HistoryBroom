@@ -29,6 +29,7 @@ $filesToPackage = @(
     "manifest.json",
     "background.js",
     "matching.js",
+    "defaults.js",
     "popup.html",
     "popup.js",
     "onboarding.html",

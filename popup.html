@@ -71,9 +71,21 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      transition: background 0.15s ease;
     }
-    summary::after { content: '+'; font-weight: bold; color: var(--muted); }
-    details[open] summary::after { content: '-'; }
+    summary:hover { background: var(--border-light); }
+    summary::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      flex-shrink: 0;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg);
+      transition: transform 0.2s ease;
+      margin-top: -2px;
+    }
+    details[open] summary::after { transform: rotate(-135deg); margin-top: 2px; }
     summary::-webkit-details-marker { display: none; }
     summary:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
       outline: 2px solid var(--accent); outline-offset: 1px;
@@ -302,7 +314,7 @@
         </div>
 
         <div class="settings-row">
-          <label><input type="checkbox" id="realtimeToggle"> Real-time Scrub <span class="info-icon" title="Instantly detects and deletes matching history entries the moment you visit them, without waiting for automated cleanups.">ⓘ</span></label>
+          <label><input type="checkbox" id="realtimeToggle"> Real-time Scrub <span class="info-icon" title="Instantly deletes matching history entries the moment you visit them, going forward. Does NOT remove existing matching history from before you turned this on; use Preview/Clear All Now for that.">ⓘ</span></label>
         </div>
 
         <div class="settings-row">
@@ -330,7 +342,7 @@
         </div>
 
         <div class="settings-row" style="margin-top:8px;">
-          <label><input type="checkbox" id="siteDataToggle"> Clean Site Data for Matches <span class="info-icon" title="Deletes cookies, local storage, databases, and cache ONLY for websites that match your keywords. Other websites remain unaffected.">ⓘ</span></label>
+          <label><input type="checkbox" id="siteDataToggle"> Clean Site Data for Matches <span class="info-icon" title="Deletes cookies, local storage, databases, and cache ONLY for websites that match your keywords. Other websites remain unaffected. Only runs during a full cleanup (Clear All Now, tab-close, idle, timer, startup); Real-time Scrub does not trigger it.">ⓘ</span></label>
         </div>
 
         <div class="settings-row" style="margin-top:8px;">
@@ -357,7 +369,7 @@
 
         <hr>
         <div class="settings-row" style="margin-top:8px;">
-          <label>Lock Popup with PIN <span class="info-icon" title="Restricts access to settings and keywords. Enter a PIN to secure the popup; leave blank and click Set PIN to disable.">ⓘ</span></label>
+          <label>Lock Popup with PIN <span class="info-icon" title="Hides settings and keywords behind a PIN screen in this popup. This is a local UI lock, not encryption; it deters casual snooping, not someone with full access to your device. Enter a PIN to secure the popup; leave blank and click Set PIN to disable.">ⓘ</span></label>
         </div>
         <div class="input-group" style="margin-top:4px;">
           <input type="password" id="pinInput" placeholder="PIN (blank = off)" aria-label="Popup PIN">
@@ -370,6 +382,10 @@
         </div>
         <div class="btn-row" style="margin-top:8px;">
           <button id="resetBtn" class="small-btn" style="flex:1; color: var(--danger); border-color: var(--error-border);">Reset to Defaults</button>
+        </div>
+
+        <div style="text-align:center; margin-top:10px;">
+          <a href="https://chromewebstore.google.com/detail/history-broom/keedhmanphadpngkncddknpgkhopbhpb" target="_blank" rel="noopener" style="font-size:0.85em; color:var(--muted);">Rate History Broom on the Chrome Web Store</a>
         </div>
 
       </div>
@@ -395,6 +411,6 @@
 
   <input type="file" id="importFile" accept=".json,application/json" hidden>
 
-  <script src="popup.js"></script>
+  <script src="popup.js" type="module"></script>
 </body>
 </html>

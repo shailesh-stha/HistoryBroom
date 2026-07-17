@@ -1,3 +1,5 @@
+import { DEFAULTS, CONFIG_DEFAULTS, LOCAL_ONLY_KEYS } from './defaults.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const $ = (id) => document.getElementById(id);
 
@@ -64,12 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function getSettings(keysWithDefaults) {
     const localData = await chrome.storage.local.get({ enableSync: false });
     const area = localData.enableSync ? chrome.storage.sync : chrome.storage.local;
-    const localKeys = ['stats', 'lastRun', 'uiStateKeywords', 'uiStateExceptions', 'uiStateSettings', 'uiStateOverview', 'enableSync'];
     const requestedLocalKeys = {};
     const requestedSharedKeys = {};
 
     for (const [key, val] of Object.entries(keysWithDefaults)) {
-      if (localKeys.includes(key)) {
+      if (LOCAL_ONLY_KEYS.includes(key)) {
         requestedLocalKeys[key] = val;
       } else {
         requestedSharedKeys[key] = val;
@@ -88,12 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const localData = await chrome.storage.local.get({ enableSync: false });
       const area = localData.enableSync ? chrome.storage.sync : chrome.storage.local;
-      const localKeys = ['stats', 'lastRun', 'uiStateKeywords', 'uiStateExceptions', 'uiStateSettings', 'uiStateOverview', 'enableSync'];
       const localItems = {};
       const sharedItems = {};
 
       for (const [key, val] of Object.entries(items)) {
-        if (localKeys.includes(key)) {
+        if (LOCAL_ONLY_KEYS.includes(key)) {
           localItems[key] = val;
         } else {
           sharedItems[key] = val;
@@ -132,11 +132,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
+  const BROAD_MATCH_THRESHOLD = 20;
+
+  // Asks background.js how many tabs/history/downloads this (not-yet-saved)
+  // keyword would currently match, so the "broad match" warning covers any
+  // keyword with real impact, not just a hardcoded list of famous domains.
+  // Returns null (fails open, no warning) if the background page can't be reached.
+  function previewKeywordImpact(kw) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'previewKeyword', keyword: kw, exceptions: savedExceptions }, (response) => {
+        if (chrome.runtime.lastError || !response || response.error) return resolve(null);
+        const r = response.result;
+        resolve(r.tabs + r.history + r.downloads);
+      });
+    });
+  }
+
+  async function confirmBroadMatch(kw) {
+    if (kw.mode === 'regex') return true; // regex impact is already opt-in/advanced; skip the extra round trip
+    const impact = await previewKeywordImpact(kw);
+    if (impact === null || impact <= BROAD_MATCH_THRESHOLD) return true;
+    return confirm(
+      `Warning: "${kw.text}" currently matches ${impact} tabs/history/download entries. ` +
+      `Scrubbing this keyword will close active tabs and wipe historical logs for all of them. Do you want to proceed?`
+    );
+  }
+
   // --- Rendering (no innerHTML with user data: XSS-safe) ---
   let editingKeywordIndex = null;
   let editingExceptionIndex = null;
 
-  function saveEditKeyword(index, val, newMode, newRange) {
+  async function saveEditKeyword(index, val, newMode, newRange) {
     let text = val.trim();
     if (!text) return showStatus('Keyword cannot be empty.', true);
 
@@ -149,12 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { new RegExp(text); } catch { return showStatus('Invalid regex pattern.', true); }
     }
 
-    // Check danger domain warning
-    const majorDomains = ['google.com', 'youtube.com', 'facebook.com', 'yahoo.com', 'wikipedia.org', 'github.com', 'amazon.com', 'twitter.com', 'instagram.com'];
-    if ((newMode === 'domain' || newMode === 'substring') && majorDomains.some(d => text.includes(d))) {
-      const proceed = confirm(`Warning: "${text}" matches a major web domain. Scrubbing this keyword will close active tabs and wipe historical logs for this website. Do you want to proceed?`);
-      if (!proceed) return;
-    }
+    if (!(await confirmBroadMatch({ text, mode: newMode, range: newRange }))) return;
 
     // Check duplicates (excluding current index)
     if (savedKeywords.some((k, i) => i !== index && k.text === text && k.mode === newMode && k.range === newRange)) {
@@ -187,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!savedKeywords.length) {
       const li = document.createElement('li');
       li.className = 'empty-state';
-      li.textContent = 'No keywords yet. Add one above.';
+      li.textContent = 'No keywords added yet.';
       keywordListUI.appendChild(li);
       return;
     }
@@ -444,69 +465,86 @@ document.addEventListener('DOMContentLoaded', () => {
     const when = new Date(lastRun.time).toLocaleString();
     const total = (stats && (stats.tabs + stats.history + stats.downloads)) || 0;
     statsBar.textContent =
-      `Last clean (${lastRun.trigger}): ${when} — ${lastRun.tabs} tabs, ` +
+      `Last clean (${lastRun.trigger}): ${when}, ${lastRun.tabs} tabs, ` +
       `${lastRun.history} history, ${lastRun.downloads} downloads. ` +
       `Total: ${total} items over ${stats ? stats.runs : 0} runs.`;
   }
 
   // --- Load all settings & UI state ---
-  getSettings({
-    keywords: [], exceptions: [], autoTab: false, autoIdle: false, idleMinutes: 5,
-    deepClean: false, cleanSiteData: false, autoTimer: false, timerSeconds: 60,
-    realtimeClean: false, cleanOnStartup: false, batchSize: 100, pinHash: null,
-    stats: null, lastRun: null,
-    uiStateKeywords: true, uiStateExceptions: false, uiStateSettings: false, uiStateOverview: false,
-    protectPinned: true, protectOpenTabs: false, enableSync: false, showBadge: true
-  }).then((data) => {
-    // Migrate legacy string[] keywords for display (background also persists this)
-    savedKeywords = data.keywords.map((k) => {
-      if (typeof k === 'string') {
-        return { text: k.toLowerCase().trim(), mode: 'substring', range: 'all' };
-      }
-      return { text: k.text, mode: k.mode, range: k.range || 'all' };
-    });
-    savedExceptions = data.exceptions;
+  getSettings(DEFAULTS).then((data) => {
+    // Populates the UI with fetched settings/keywords. Deliberately not called
+    // until the PIN gate (if any) is passed, so a locked popup never puts
+    // keywords/exceptions/stats into the DOM where devtools could read them.
+    function populateUI() {
+      // Migrate legacy string[] keywords for display (background also persists this)
+      savedKeywords = data.keywords.map((k) => {
+        if (typeof k === 'string') {
+          return { text: k.toLowerCase().trim(), mode: 'substring', range: 'all' };
+        }
+        return { text: k.text, mode: k.mode, range: k.range || 'all' };
+      });
+      savedExceptions = data.exceptions;
 
-    autoTabToggle.checked = data.autoTab;
-    startupToggle.checked = data.cleanOnStartup;
-    realtimeToggle.checked = data.realtimeClean;
-    idleToggle.checked = data.autoIdle;
-    idleMinsInput.value = data.idleMinutes;
-    timerToggle.checked = data.autoTimer;
-    timerSecsInput.value = data.timerSeconds;
-    siteDataToggle.checked = data.cleanSiteData;
-    protectPinnedToggle.checked = data.protectPinned;
-    protectOpenTabsToggle.checked = data.protectOpenTabs;
-    showBadgeToggle.checked = data.showBadge;
-    enableSyncToggle.checked = data.enableSync;
-    deepCleanToggle.checked = data.deepClean;
-    batchSizeInput.value = data.batchSize;
+      autoTabToggle.checked = data.autoTab;
+      startupToggle.checked = data.cleanOnStartup;
+      realtimeToggle.checked = data.realtimeClean;
+      idleToggle.checked = data.autoIdle;
+      idleMinsInput.value = data.idleMinutes;
+      timerToggle.checked = data.autoTimer;
+      timerSecsInput.value = data.timerSeconds;
+      siteDataToggle.checked = data.cleanSiteData;
+      protectPinnedToggle.checked = data.protectPinned;
+      protectOpenTabsToggle.checked = data.protectOpenTabs;
+      showBadgeToggle.checked = data.showBadge;
+      enableSyncToggle.checked = data.enableSync;
+      deepCleanToggle.checked = data.deepClean;
+      batchSizeInput.value = data.batchSize;
 
-    detailsKeywords.open = data.uiStateKeywords;
-    detailsExceptions.open = data.uiStateExceptions;
-    detailsSettings.open = data.uiStateSettings;
+      detailsKeywords.open = data.uiStateKeywords;
+      detailsExceptions.open = data.uiStateExceptions;
+      detailsSettings.open = data.uiStateSettings;
 
-
-    renderKeywords();
-    renderExceptions();
-    renderStats(data.stats, data.lastRun);
+      renderKeywords();
+      renderExceptions();
+      renderStats(data.stats, data.lastRun);
+    }
 
     // PIN gate
     if (data.pinHash) {
       lockScreen.hidden = false;
       pinEntry.focus();
+      let failedAttempts = 0;
       const tryUnlock = async () => {
         if (await sha256(pinEntry.value) === data.pinHash) {
+          failedAttempts = 0;
           lockScreen.hidden = true;
+          populateUI();
           main.hidden = false;
+          return;
+        }
+        pinEntry.value = '';
+        failedAttempts++;
+        // After 5 wrong tries, back off with a growing delay (capped at 30s)
+        // to slow down brute-forcing the PIN from the popup UI.
+        if (failedAttempts >= 5) {
+          const delayMs = Math.min(30000, 2 ** (failedAttempts - 5) * 1000);
+          pinEntry.disabled = true;
+          unlockBtn.disabled = true;
+          pinEntry.placeholder = `Too many attempts, wait ${Math.ceil(delayMs / 1000)}s`;
+          setTimeout(() => {
+            pinEntry.disabled = false;
+            unlockBtn.disabled = false;
+            pinEntry.placeholder = 'Enter PIN';
+            pinEntry.focus();
+          }, delayMs);
         } else {
-          pinEntry.value = '';
           pinEntry.placeholder = 'Wrong PIN';
         }
       };
       unlockBtn.addEventListener('click', tryUnlock);
       pinEntry.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
     } else {
+      populateUI();
       main.hidden = false;
     }
   });
@@ -521,7 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // --- Keywords ---
-  function addKeyword() {
+  async function addKeyword() {
     const mode = modeSelect.value;
     const range = rangeSelect.value;
     let text = keywordInput.value.trim();
@@ -537,12 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
       try { new RegExp(text); } catch { return showStatus('Invalid regex pattern.', true); }
     }
 
-    // Guardrail 2: Danger Zone Warning for Major Domains
-    const majorDomains = ['google.com', 'youtube.com', 'facebook.com', 'yahoo.com', 'wikipedia.org', 'github.com', 'amazon.com', 'twitter.com', 'instagram.com'];
-    if ((mode === 'domain' || mode === 'substring') && majorDomains.some(d => text.includes(d))) {
-      const proceed = confirm(`Warning: "${text}" matches a major web domain. Scrubbing this keyword will close active tabs and wipe historical logs for this website. Do you want to proceed?`);
-      if (!proceed) return;
-    }
+    // Guardrail 2: Broad-match warning, sized against your actual tabs/history/downloads
+    if (!(await confirmBroadMatch({ text, mode, range }))) return;
 
     if (savedKeywords.some((k) => k.text === text && k.mode === mode && k.range === range)) {
       return showStatus('Already in the list.', true);
@@ -614,14 +648,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const oldArea = enableSync ? chrome.storage.local : chrome.storage.sync;
     const newArea = enableSync ? chrome.storage.sync : chrome.storage.local;
 
-    const configKeys = {
-      keywords: [], exceptions: [], autoTab: false, autoIdle: false, idleMinutes: 5,
-      deepClean: false, cleanSiteData: false, autoTimer: false, timerSeconds: 60,
-      realtimeClean: false, cleanOnStartup: false, batchSize: 100, pinHash: null,
-      protectPinned: true, protectOpenTabs: false, showBadge: true
-    };
+    const data = await oldArea.get(CONFIG_DEFAULTS);
 
-    const data = await oldArea.get(configKeys);
+    if (enableSync) {
+      // chrome.storage.sync caps each individual item at QUOTA_BYTES_PER_ITEM
+      // (8KB); a large keyword/exception list would otherwise fail to sync
+      // with only a generic "quota exceeded" error after the fact.
+      const perItemLimit = chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
+      const oversized = Object.entries(data).find(([key, val]) => {
+        const bytes = new TextEncoder().encode(key + JSON.stringify(val)).length;
+        return bytes > perItemLimit;
+      });
+      if (oversized) {
+        e.target.checked = false;
+        showStatus(
+          `Can't enable sync: "${oversized[0]}" is too large for Chrome's ${perItemLimit}-byte sync limit per item. Trim your keyword/exception list first.`,
+          true
+        );
+        return;
+      }
+    }
+
     await newArea.set(data);
     await chrome.storage.local.set({ enableSync });
 
@@ -667,7 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateTimerSettings() {
     let seconds = parseInt(timerSecsInput.value, 10);
     if (!Number.isFinite(seconds)) seconds = 60;
-    if (seconds < 60) { seconds = 60; showStatus('Chrome allows 60s minimum in production — clamped.', true); }
+    if (seconds < 60) { seconds = 60; showStatus('Chrome allows 60s minimum in production, clamped.', true); }
     timerSecsInput.value = seconds;
     setSettings({ autoTimer: timerToggle.checked, timerSeconds: seconds }).then(() =>
       chrome.runtime.sendMessage({ action: 'updateTimer' }));
@@ -688,12 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Export / Import ---
   exportBtn.addEventListener('click', () => {
-    getSettings({
-      keywords: [], exceptions: [], autoTab: false, autoIdle: false, idleMinutes: 5,
-      deepClean: false, cleanSiteData: false, autoTimer: false, timerSeconds: 60,
-      realtimeClean: false, cleanOnStartup: false, batchSize: 100, pinHash: null,
-      protectPinned: true, protectOpenTabs: false, showBadge: true
-    }).then((data) => {
+    getSettings(CONFIG_DEFAULTS).then((data) => {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -775,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
           setTimeout(() => location.reload(), 800);
         });
       } catch (err) {
-        showStatus('Invalid import file.', 'error');
+        showStatus('Invalid import file.', true);
       }
     };
     reader.readAsText(file);
@@ -788,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await chrome.storage.sync.clear();
       chrome.runtime.sendMessage({ action: 'updateTimer' });
       chrome.runtime.sendMessage({ action: 'updateIdle' });
-      showStatus('Extension reset to defaults. Reopening...', 'success');
+      showStatus('Extension reset to defaults. Reopening...', false);
       setTimeout(() => location.reload(), 1500);
     }
   });

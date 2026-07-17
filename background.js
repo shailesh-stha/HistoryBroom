@@ -1,24 +1,5 @@
-import { matches, matchesAny, isExcepted } from './matching.js';
-
-// --- Defaults (single source of truth for storage schema) ---
-const DEFAULTS = {
-  keywords: [],        // [{ text, mode, range }] mode: substring | word | domain | regex; range: all | 1h | 24h | 7d | older30d
-  exceptions: [],      // lowercased strings; anything matching one is never removed
-  autoTab: false,
-  autoIdle: false,
-  idleMinutes: 5,
-  deepClean: false,
-  cleanSiteData: false,
-  autoTimer: false,
-  timerSeconds: 60,
-  realtimeClean: false,
-  cleanOnStartup: false,
-  batchSize: 100,
-  protectPinned: true,
-  protectOpenTabs: false,
-  enableSync: false,
-  showBadge: true
-};
+import { matchesAny, historyStartTime, filterHistoryMatches, filterDownloadMatches, selectTabsToAct } from './matching.js';
+import { DEFAULTS } from './defaults.js';
 
 async function getConfig() {
   const localData = await chrome.storage.local.get({ enableSync: false });
@@ -42,47 +23,21 @@ async function getConfig() {
 }
 
 // --- Collection (shared by preview and cleanup) ---
-async function searchHistory(kw) {
-  const text = kw.mode === 'regex' ? '' : kw.text;
-  let startTime = 0;
+// Fetch + filter are split so the actual matching/range/exception decisions
+// (the risky, easy-to-get-wrong part) live in matching.js as plain functions
+// that can be unit tested without a chrome.* mock. See backup/test_collect.mjs.
+async function searchHistory(kw, exceptions) {
   const now = Date.now();
-  if (kw.range === '1h') startTime = now - 60 * 60 * 1000;
-  else if (kw.range === '24h') startTime = now - 24 * 60 * 60 * 1000;
-  else if (kw.range === '7d') startTime = now - 7 * 24 * 60 * 60 * 1000;
-
-  const results = await chrome.history.search({ text, startTime, maxResults: 100000 });
-  return results.filter((h) => {
-    if (!matches(kw, h.title, h.url)) return false;
-    if (kw.range === 'older30d') {
-      return h.lastVisitTime < now - 30 * 24 * 60 * 60 * 1000;
-    }
-    return true;
-  });
+  const text = kw.mode === 'regex' ? '' : kw.text;
+  const results = await chrome.history.search({ text, startTime: historyStartTime(kw, now), maxResults: 100000 });
+  return filterHistoryMatches(results, kw, exceptions, now);
 }
 
-async function searchDownloads(kw) {
+async function searchDownloads(kw, exceptions) {
+  const now = Date.now();
   const query = kw.mode === 'regex' ? {} : { query: [kw.text] };
   const results = await chrome.downloads.search(query);
-  const now = Date.now();
-  return results.filter((d) => {
-    if (!matches(kw, d.filename, d.url || d.finalUrl)) return false;
-    if (!kw.range || kw.range === 'all') return true;
-    const downloadTime = d.startTime ? new Date(d.startTime).getTime() : 0;
-    if (!downloadTime) return false;
-    const diff = now - downloadTime;
-    switch (kw.range) {
-      case '1h':
-        return diff <= 60 * 60 * 1000;
-      case '24h':
-        return diff <= 24 * 60 * 60 * 1000;
-      case '7d':
-        return diff <= 7 * 24 * 60 * 60 * 1000;
-      case 'older30d':
-        return diff > 30 * 24 * 60 * 60 * 1000;
-      default:
-        return true;
-    }
-  });
+  return filterDownloadMatches(results, kw, exceptions, now);
 }
 
 async function collectMatches(cfg) {
@@ -96,31 +51,25 @@ async function collectMatches(cfg) {
   };
 
   const tabs = await chrome.tabs.query({});
-  for (const tab of tabs) {
-    if (tab.id !== undefined) {
-      if (matchesAny(keywords, exceptions, tab.title, tab.url)) {
-        addOrigin(tab.url);
-        const shouldClose = !protectOpenTabs && (!protectPinned || !tab.pinned);
-        if (shouldClose) {
-          found.tabIds.push(tab.id);
-        }
-      }
-    }
-  }
+  const tabSelection = selectTabsToAct(tabs, keywords, exceptions, protectPinned, protectOpenTabs);
+  found.tabIds = tabSelection.tabIds;
+  tabSelection.origins.forEach(addOrigin);
 
   const urlSet = new Set();
   const dlSet = new Set();
-  for (const kw of keywords) {
-    for (const h of await searchHistory(kw)) {
-      if (h.url && !isExcepted(exceptions, h.title, h.url)) {
-        urlSet.add(h.url);
-        addOrigin(h.url);
-      }
+  // Keywords are searched concurrently (each keyword's history+downloads lookups
+  // also run concurrently) instead of one sequential await chain per keyword.
+  await Promise.all(keywords.map(async (kw) => {
+    const [urls, downloads] = await Promise.all([searchHistory(kw, exceptions), searchDownloads(kw, exceptions)]);
+    for (const url of urls) {
+      urlSet.add(url);
+      addOrigin(url);
     }
-    for (const d of await searchDownloads(kw)) {
-      if (!isExcepted(exceptions, d.filename, d.url || d.finalUrl)) dlSet.add(d.id);
+    for (const { id, url } of downloads) {
+      dlSet.add(id);
+      if (url) addOrigin(url);
     }
-  }
+  }));
   found.urls = [...urlSet];
   found.downloadIds = [...dlSet];
   // browsingData origins must be http(s)
@@ -152,7 +101,7 @@ async function performFullCleanup(trigger) {
       for (let i = 0; i < found.urls.length; i += bSize) {
         const chunk = found.urls.slice(i, i + bSize);
         await Promise.all(chunk.map((url) => chrome.history.deleteUrl({ url })));
-        await new Promise((r) => setTimeout(r, 20)); // Small delay to prevent blocking
+        if (i + bSize < found.urls.length) await new Promise((r) => setTimeout(r, 20)); // Small delay to prevent blocking
       }
       result.history = found.urls.length;
     } catch (e) { console.warn('History cleanup failed:', e); }
@@ -162,7 +111,7 @@ async function performFullCleanup(trigger) {
       for (let i = 0; i < found.downloadIds.length; i += bSize) {
         const chunk = found.downloadIds.slice(i, i + bSize);
         await Promise.all(chunk.map((id) => chrome.downloads.erase({ id })));
-        await new Promise((r) => setTimeout(r, 20));
+        if (i + bSize < found.downloadIds.length) await new Promise((r) => setTimeout(r, 20));
       }
       result.downloads = found.downloadIds.length;
     } catch (e) { console.warn('Downloads cleanup failed:', e); }
@@ -320,6 +269,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'preview') {
     getConfig()
       .then(collectMatches)
+      .then((found) => sendResponse({
+        result: { tabs: found.tabIds.length, history: found.urls.length, downloads: found.downloadIds.length }
+      }))
+      .catch((e) => sendResponse({ error: e.message }));
+    return true;
+  }
+  if (request.action === 'previewKeyword') {
+    // Impact preview for a single not-yet-saved keyword, used by the popup's
+    // broad-match warning. Ignores tab-protection settings so the count
+    // reflects everything the keyword would match, not just what gets closed.
+    collectMatches({
+      keywords: [request.keyword],
+      exceptions: request.exceptions || [],
+      protectPinned: false,
+      protectOpenTabs: false
+    })
       .then((found) => sendResponse({
         result: { tabs: found.tabIds.length, history: found.urls.length, downloads: found.downloadIds.length }
       }))
